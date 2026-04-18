@@ -5,7 +5,6 @@ pipeline {
         DEV_SERVER = "3.110.178.21"
         STG_SERVER = "3.111.144.226"
         PRD_SERVER = "13.232.160.131"
-        USER = "root"
     }
 
     stages {
@@ -16,25 +15,17 @@ pipeline {
             }
         }
 
-        stage('Install Apache') {
-            steps {
-                sh '''
-                sudo yum install httpd -y
-                sudo systemctl start httpd
-                sudo systemctl enable httpd
-                '''
-            }
-        }
-
         stage('Deploy to DEV') {
             when {
                 branch 'dev'
             }
             steps {
-                sh '''
-                sudo cp index.html /var/www/html/index.html
-                sudo systemctl restart httpd
-                '''
+                sshagent(['ec2-ssh']) {
+                    sh '''
+                    scp -o StrictHostKeyChecking=no index.html ec2-user@$DEV_SERVER:/tmp/
+                    ssh ec2-user@$DEV_SERVER "sudo cp /tmp/index.html /var/www/html/index.html && sudo systemctl restart httpd"
+                    '''
+                }
             }
         }
 
@@ -43,10 +34,12 @@ pipeline {
                 branch 'stg'
             }
             steps {
-                sh '''
-                sudo cp index.html /var/www/html/index.html
-                sudo systemctl restart httpd
-                '''
+                sshagent(['ec2-ssh']) {
+                    sh '''
+                    scp -o StrictHostKeyChecking=no index.html ec2-user@$STG_SERVER:/tmp/
+                    ssh ec2-user@$STG_SERVER "sudo cp /tmp/index.html /var/www/html/index.html && sudo systemctl restart httpd"
+                    '''
+                }
             }
         }
 
@@ -55,10 +48,12 @@ pipeline {
                 branch 'main'
             }
             steps {
-                sh '''
-                sudo cp index.html /var/www/html/index.html
-                sudo systemctl restart httpd
-                '''
+                sshagent(['ec2-ssh']) {
+                    sh '''
+                    scp -o StrictHostKeyChecking=no index.html ec2-user@$PRD_SERVER:/tmp/
+                    ssh ec2-user@$PRD_SERVER "sudo cp /tmp/index.html /var/www/html/index.html && sudo systemctl restart httpd"
+                    '''
+                }
             }
         }
     }
@@ -67,7 +62,6 @@ pipeline {
         success {
             echo "Deployment Successful"
         }
-
         failure {
             echo "Deployment Failed"
         }
